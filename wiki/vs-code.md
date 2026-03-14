@@ -60,7 +60,7 @@
   - [Open the file](#open-the-file)
     - [Open the file using `Quick Open`](#open-the-file-using-quick-open)
     - [Open the file using `code`](#open-the-file-using-code)
-    - [Open the file using a context menu](#open-the-file-using-a-context-menu)
+    - [Open the file using the context menu](#open-the-file-using-the-context-menu)
   - [Open the `Markdown` preview](#open-the-markdown-preview)
 - [Language server](#language-server)
   - [Type on hover](#type-on-hover)
@@ -642,7 +642,7 @@ Here are some [workspace settings](#workspace-settings) that you can change:
 - Method 1: [Open the local file using `VS Code Explorer`](#open-the-local-file-using-the-vs-code-explorer)
 - Method 2: [Open the file using `Quick Open`](#open-the-file-using-quick-open)
 - Method 3: [Open the file using `code`](#open-the-file-using-code)
-- Method 4: [Open the file using a context menu](#open-the-file-using-a-context-menu)
+- Method 4: [Open the file using a context menu](#open-the-file-using-the-context-menu)
 
 #### Open the file using `Quick Open`
 
@@ -671,11 +671,13 @@ Here are some [workspace settings](#workspace-settings) that you can change:
    >
    > [Add `VS Code` to `PATH`](#macos-only-add-vs-code-to-path).
 
-#### Open the file using a context menu
+#### Open the file using the context menu
 
-1. Right-click a file.
-2. Find `Open with...` or similar.
-3. Choose `VS Code`.
+1. Open any file explorer app installed on your system.
+2. Find the file or the directory in that app.
+3. Right-click the file or the directory.
+4. Find `Open with...` or similar.
+5. Choose `VS Code`.
 
 ### Open the `Markdown` preview
 
