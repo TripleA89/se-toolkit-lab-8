@@ -28,7 +28,7 @@
       "lms": {
         "type": "stdio",
         "command": "python",
-        "args": ["-m", "lms_mcp"]
+        "args": ["-m", "mcp_lms"]
       }
     }
   }

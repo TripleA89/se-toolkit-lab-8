@@ -23,14 +23,11 @@ nanobot/
 └── architecture.md          # This file
 
 mcp/                         # Top-level MCP package (separate workspace member)
-├── lms_common/              # Shared library (LMS client, models, formatters)
-│   ├── __init__.py
-│   ├── lms_client.py        # HTTP client for the LMS backend API
-│   ├── models.py            # Pydantic models for LMS API responses
-│   └── formatters.py        # Pure formatting functions
-├── lms_mcp/                 # Stdio MCP server exposing LMS API as typed tools
-│   ├── __init__.py          # Tool definitions + handlers (wraps LMSClient)
-│   └── __main__.py          # Entry point for `python -m lms_mcp`
+├── mcp_lms/                 # LMS backend — client + MCP tools
+│   ├── __init__.py          # Re-exports from client and server
+│   ├── client.py            # HTTP client, models, formatters
+│   ├── server.py            # MCP tool definitions + handlers
+│   └── __main__.py          # Entry point for `python -m mcp_lms`
 └── pyproject.toml           # Package definition (lms-mcp)
 ```
 
@@ -124,4 +121,4 @@ No agent involvement. Sub-second response. Commands: `/start`, `/help`, `/health
 
 5. **Slow responses to free text**: The nanobot agent runs tool calls (mcp_lms_*, read_file) before answering. This is normal — the agent may take 10-60s for complex queries. Slash commands bypass this entirely.
 
-6. **`setuptools` build error ("Multiple top-level packages")**: The `[tool.setuptools.packages.find]` section in each `pyproject.toml` must explicitly include its packages — `nanobot_webchat` in `nanobot/pyproject.toml`, `lms_common` and `lms_mcp` in `mcp/pyproject.toml`.
+6. **`setuptools` build error ("Multiple top-level packages")**: The `[tool.setuptools.packages.find]` section in each `pyproject.toml` must explicitly include its packages — `nanobot_webchat` in `nanobot/pyproject.toml`, `mcp_lms` in `mcp/pyproject.toml`.
