@@ -13,18 +13,24 @@
   },
   "providers": {
     "custom": {
-      "apiKey": "G-aUT3cWShhcQn7WZiZ6VjFSLI0fw1_MsWSx0KdaNNHk1ewdo-SiTupNr383UeZ9uaxfEi1EXJmDYfbGab0ntA",
-      "apiBase": "http://localhost:42005/v1"
+      "apiKey": "",
+      "apiBase": ""
+    }
+  },
+  "channels": {
+    "webchat": {
+      "enabled": true,
+      "allow_from": ["*"]
     }
   },
   "tools": {
     "mcpServers": {
       "lms": {
-        "command": "uv",
-        "args": ["--directory", "/root/se-toolkit-lab-8/mcp", "run", "python", "-m", "mcp_lms"],
+        "command": "python",
+        "args": ["-m", "mcp_lms"],
         "env": {
-          "NANOBOT_LMS_BACKEND_URL": "http://localhost:42002",
-          "NANOBOT_LMS_API_KEY": "lms-key"
+          "NANOBOT_LMS_BACKEND_URL": "",
+          "NANOBOT_LMS_API_KEY": ""
         }
       }
     }

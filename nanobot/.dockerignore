@@ -1,0 +1,8 @@
+# Nanobot Dockerfile uses ./nanobot context, so this .dockerignore applies
+# Keep it minimal to avoid excluding needed files
+
+__pycache__/
+*.pyc
+.venv/
+.git/
+*.md
