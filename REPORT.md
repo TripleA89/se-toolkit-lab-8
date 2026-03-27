@@ -129,11 +129,41 @@ The skill prompt (`nanobot/workspace/skills/lms/SKILL.md`) taught the agent to:
 
 ## Task 2A — Deployed agent
 
-<!-- Paste a short nanobot startup log excerpt showing the gateway started inside Docker -->
+**Nanobot startup log excerpt:**
+
+```
+nanobot-1  | Using config: /app/nanobot/config.resolved.json           
+nanobot-1  | 🐈 Starting nanobot gateway version 0.1.4.post6 on port 18790...
+nanobot-1  | 2026-03-27 17:16:17.548 | INFO     | nanobot.channels.manager:_init_channels:58 - WebChat channel enabled
+nanobot-1  | ✓ Channels enabled: webchat
+nanobot-1  | ✓ Heartbeat: every 1800s
+nanobot-1  | 2026-03-27 17:16:17.930 | INFO     | nanobot_webchat.channel:start:72 - WebChat starting on 0.0.0.0:8765
+nanobot-1  | 2026-03-27 17:16:19.952 | INFO     | nanobot.agent.tools.mcp:connect_mcp_servers:246 - MCP server 'lms': connected, 9 tools registered
+nanobot-1  | 2026-03-27 17:16:19.953 | INFO     | nanobot.agent.loop:run:280 - Agent loop started
+```
+
+**Verification:**
+- `docker compose ps` shows nanobot service running
+- WebChat channel enabled on port 8765
+- MCP server 'lms' connected with 9 tools (labs, learners, scores, etc.)
 
 ## Task 2B — Web client
 
-<!-- Screenshot of a conversation with the agent in the Flutter web app -->
+**WebSocket test:** The agent successfully responded to "What labs are available?" via WebSocket:
+
+```
+nanobot-1  | 2026-03-27 17:23:45.087 | INFO     | nanobot_webchat.channel:_handle_ws:120 - WebChat: new connection chat_id=fc28af12-cdb6-4b82-bfe6-dbe721eef7fc
+nanobot-1  | 2026-03-27 17:23:45.235 | INFO     | nanobot.agent.loop:_process_message:425 - Processing message from webchat:fc28af12-cdb6-4b82-bfe6-dbe721eef7fc: What labs are available?
+nanobot-1  | 2026-03-27 17:23:57.881 | INFO     | nanobot.agent.loop:before_execute_tools:254 - Tool call: mcp_lms_lms_labs({})
+nanobot-1  | 2026-03-27 17:24:08.440 | INFO     | nanobot.agent.loop:_process_message:479 - Response to webchat:fc28af12-cdb6-4b82-bfe6-dbe721eef7fc: Here are the available labs:
+```
+
+**Flutter web client:**
+- Accessible at `http://<vm-ip>:42002/flutter`
+- Protected by `NANOBOT_ACCESS_KEY` authentication
+- Successfully tested with conversation: "What labs are available?" → Agent returned real LMS data
+
+![Flutter web client conversation](instructors/task-2-flutter-screenshot.png)
 
 ## Task 3A — Structured logging
 
