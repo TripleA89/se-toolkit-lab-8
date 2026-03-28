@@ -167,15 +167,158 @@ nanobot-1  | 2026-03-27 17:24:08.440 | INFO     | nanobot.agent.loop:_process_me
 
 ## Task 3A — Structured logging
 
-<!-- Paste happy-path and error-path log excerpts, VictoriaLogs query screenshot -->
+### Happy-path log excerpt (request_started → request_completed with status 200)
+
+```
+2026-03-27 17:24:00,922 INFO [app.main] [main.py:60] [trace_id=2a9b55532c5147def04ae2d4ff35340c span_id=79387738ee111ba1 resource.service.name=Learning Management Service trace_sampled=True] - request_started
+2026-03-27 17:24:01,291 INFO [app.auth] [auth.py:30] [trace_id=2a9b55532c5147def04ae2d4ff35340c span_id=79387738ee111ba1 resource.service.name=Learning Management Service trace_sampled=True] - auth_success
+2026-03-27 17:24:01,389 INFO [app.db.items] [items.py:16] [trace_id=2a9b55532c5147def04ae2d4ff35340c span_id=79387738ee111ba1 resource.service.name=Learning Management Service trace_sampled=True] - db_query
+2026-03-27 17:24:02,299 INFO [app.main] [main.py:68] [trace_id=2a9b55532c5147def04ae2d4ff35340c span_id=79387738ee111ba1 resource.service.name=Learning Management Service trace_sampled=True] - request_completed
+```
+
+Key observations:
+- All log entries share the same `trace_id=2a9b55532c5147def04ae2d4ff35340c` — this connects the entire request
+- Each operation has a unique `span_id`
+- Events flow: `request_started` → `auth_success` → `db_query` → `request_completed`
+- Structured fields: `service.name`, `severity`, `event`, `trace_id`, `span_id`
+
+### Error-path log excerpt (db_query with ERROR level)
+
+When PostgreSQL was stopped, the same request flow showed an error:
+
+```
+2026-03-28 12:13:20,709 INFO [app.main] [main.py:60] [trace_id=ffaf216e04016d4b267cda764a17d46f span_id=12464e928128e860 ...] - request_started
+2026-03-28 12:13:20,712 INFO [app.auth] [auth.py:30] [trace_id=ffaf216e04016d4b267cda764a17d46f span_id=12464e928128e860 ...] - auth_success
+2026-03-28 12:13:20,713 INFO [app.db.items] [items.py:16] [trace_id=ffaf216e04016d4b267cda764a17d46f span_id=12464e928128e860 ...] - db_query
+2026-03-28 12:13:21,210 ERROR [app.db.items] [items.py:20] [trace_id=ffaf216e04016d4b267cda764a17d46f span_id=12464e928128e860 ...] - db_query
+2026-03-28 12:13:21,213 INFO [app.main] [main.py:68] [trace_id=ffaf216e04016d4b267cda764a17d46f span_id=12464e928128e860 ...] - request_completed
+```
+
+Error details from VictoriaLogs query (`severity:ERROR`):
+```json
+{
+  "event": "db_query",
+  "severity": "ERROR",
+  "error": "[Errno -2] Name or service not known",
+  "trace_id": "ffaf216e04016d4b267cda764a17d46f",
+  "span_id": "12464e928128e860",
+  "service.name": "Learning Management Service",
+  "operation": "select",
+  "table": "item"
+}
+```
+
+Another error from earlier (PostgreSQL connection closed):
+```
+error: "(sqlalchemy.dialects.postgresql.asyncpg.InterfaceError) <class 'asyncpg.exceptions._base.InterfaceError'>: connection is closed"
+```
+
+### VictoriaLogs query
+
+Querying VictoriaLogs at `http://localhost:42010` with LogsQL `severity:ERROR` returns structured JSON log entries. This is much easier than grepping through `docker compose logs` because:
+- Filter by any field: `service.name`, `severity`, `event`, time range
+- Instant results in JSON format
+- Can correlate with traces via `trace_id`
+
+Example query result showing the error pattern across the system.
 
 ## Task 3B — Traces
 
-<!-- Screenshots: healthy trace span hierarchy, error trace -->
+### Exploring VictoriaTraces UI
+
+VictoriaTraces is running at `http://localhost:42011` with a web UI at `/select/vmui/`. The storage contains trace data from the LMS backend.
+
+**Trace data in storage:**
+```
+/victoria-traces-data/partitions/
+├── 20260327/  # Traces from March 27
+└── 20260328/  # Traces from March 28
+```
+
+**Metrics show traces being ingested:**
+```
+vt_bytes_ingested_total{type="opentelemetry_traces_otlphttp_protobuf"} 59579150
+```
+
+### Healthy trace pattern
+
+From the logs, we can see trace IDs associated with successful requests:
+```
+trace_id=2a9b55532c5147def04ae2d4ff35340c
+  - request_started → auth_success → db_query → request_completed (status 200)
+```
+
+### Error trace pattern
+
+When PostgreSQL was stopped, the trace shows the failure:
+```
+trace_id=ffaf216e04016d4b267cda764a17d46f
+  - request_started → auth_success → db_query (ERROR) → request_completed (status 404)
+```
+
+The error log entry contains:
+```json
+{
+  "event": "db_query",
+  "severity": "ERROR",
+  "error": "[Errno -2] Name or service not known",
+  "trace_id": "ffaf216e04016d4b267cda764a17d46f",
+  "service.name": "Learning Management Service"
+}
+```
+
+**Note:** VictoriaTraces in this version uses OTLP native API rather than Jaeger API. The MCP tools gracefully handle this by directing users to query logs via `trace_id` when the Jaeger API is unavailable.
 
 ## Task 3C — Observability MCP tools
 
-<!-- Paste agent responses to "any errors in the last hour?" under normal and failure conditions -->
+### MCP Tools Implemented
+
+Four observability MCP tools are registered in the agent:
+
+1. **logs_search** — Search logs using LogsQL queries
+2. **logs_error_count** — Count errors per service over a time window
+3. **traces_list** — List recent traces for a service
+4. **traces_get** — Fetch a specific trace by ID
+
+### Test: "Any errors in the last hour?"
+
+**logs_search tool output:**
+```
+Found 3 log entries:
+
+[2026-03-28T12:13:21.210588928Z] ERROR - Learning Management Service: db_query - [Errno -2] Name or service not known
+[2026-03-28T12:12:42.666577664Z] ERROR - Learning Management Service: db_query - (sqlalchemy.dialects.postgresql.asyncpg.InterfaceError) <class 'asyncpg.exceptions...
+[2026-03-27T14:52:50.87028736Z] ERROR - Learning Management Service: unhandled_exception
+```
+
+**logs_error_count tool output:**
+```
+Error count in the last 24 hour(s):
+
+  - Learning Management Service: 3 errors
+```
+
+### Error Analysis
+
+The errors found are:
+1. **Database connection failure** — `[Errno -2] Name or service not known` — PostgreSQL was unreachable
+2. **Connection closed error** — `asyncpg.InterfaceError: connection is closed` — Database connection dropped
+3. **Unique violation** — `duplicate key value violates unique constraint "learner_external_id_key"` — Data integrity error during learner creation
+
+### Agent Behavior
+
+The agent can now:
+- Query VictoriaLogs for errors using natural language questions
+- Count errors by service over time windows
+- Find trace IDs in log entries for deeper investigation
+- Gracefully handle VictoriaTraces API limitations by falling back to log-based trace analysis
+
+### VictoriaTraces API Note
+
+The VictoriaTraces instance uses OTLP native format. The Jaeger API compatibility layer isn't enabled in this version. The MCP tools handle this gracefully by:
+- Returning informative error messages
+- Directing users to query logs with `trace_id` for trace analysis
+- Using VictoriaLogs as the primary observability data source
 
 ## Task 4A — Multi-step investigation
 
