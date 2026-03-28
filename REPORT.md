@@ -322,15 +322,161 @@ The VictoriaTraces instance uses OTLP native format. The Jaeger API compatibilit
 
 ## Task 4A — Multi-step investigation
 
-<!-- Paste the agent's response to "What went wrong?" showing chained log + trace investigation -->
+### Planted Bug Discovery
+
+**Location:** `backend/app/routers/items.py`, function `get_items`
+
+**Original code:**
+```python
+@router.get("/", response_model=list[ItemRecord])
+async def get_items(session: AsyncSession = Depends(get_session)):
+    """Get all items."""
+    try:
+        return await read_items(session)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Items not found",
+        ) from exc
+```
+
+**Problem:** Any exception (including database connection failures) was returned as `404 NOT_FOUND` with message "Items not found". This masked the real underlying error.
+
+### Investigation with PostgreSQL Stopped
+
+**Step 1:** Stop PostgreSQL
+```bash
+docker compose --env-file .env.docker.secret stop postgres
+```
+
+**Step 2:** Trigger request
+```bash
+curl -s http://localhost:42002/items/ -H "Authorization: Bearer lms-key"
+# Response: {"detail":"Items not found"}  # Before fix
+# Response: {"detail":"Database error occurred"}  # After fix
+```
+
+**Step 3:** Agent investigation via `logs_search`:
+```
+Found 3 log entries:
+
+[2026-03-28T12:43:28.501821696Z] ERROR - Learning Management Service: db_query - [Errno -2] Name or service not known
+[2026-03-28T12:13:21.210588928Z] ERROR - Learning Management Service: db_query - [Errno -2] Name or service not known
+[2026-03-28T12:12:42.666577664Z] ERROR - Learning Management Service: db_query - (sqlalchemy.dialects.postgresql.asyncpg.InterfaceError)
+```
+
+**Step 4:** Reconstruct request flow via `trace_id`:
+```
+Query: trace_id:6fb89e66a692bb3c5f76aec1fd84a1ce
+
+Found 5 log entries:
+[2026-03-28T12:43:28.504002816Z] INFO - request_completed
+[2026-03-28T12:43:28.501821696Z] ERROR - db_query - [Errno -2] Name or service not known
+[2026-03-28T12:43:28.315707904Z] INFO - db_query
+[2026-03-28T12:43:28.314982144Z] INFO - auth_success
+[2026-03-28T12:43:28.31271168Z] INFO - request_started
+```
+
+**Agent Response Summary:**
+"⚠️ **Failure detected at 12:43:28**
+
+**Root cause:** Database connection failure — PostgreSQL unreachable
+
+**Request flow:**
+- 12:43:28.312 — request_started (GET /items/)
+- 12:43:28.314 — auth_success
+- 12:43:28.315 — db_query (attempting SELECT)
+- 12:43:28.501 — **ERROR: db_query failed** — `[Errno -2] Name or service not known`
+- 12:43:28.504 — request_completed (500 Internal Server Error)
+
+**Action:** Check PostgreSQL container: `docker compose ps postgres`"
+
+## Task 4B — Proactive health check
+
+### Scheduled Health Check
+
+The agent can create a cron job that runs every 2 minutes and posts health reports to the chat.
+
+**Commands:**
+1. Create health check: "Create a health check for this chat that runs every 2 minutes..."
+2. List jobs: "List scheduled jobs."
+3. Remove job: "Remove the health check job."
+
+**Proactive Report Format:**
+```
+⚠️ System Health Report - 12:45:00
+
+Errors in last 2 minutes: 3
+- Learning Management Service: 3 database connection failures
+
+Root cause: PostgreSQL unreachable
+Impact: All database queries failing
+```
+
+## Task 4C — Bug fix and recovery
+
+### Root Cause
+
+**Planted bug:** In `backend/app/routers/items.py`, the `get_items` function caught all exceptions and returned `404 NOT_FOUND` instead of `500 Internal Server Error` for database failures.
+
+### Fix Applied
+
+**Changed file:** `backend/app/routers/items.py`
+
+**Diff:**
+```python
+- raise HTTPException(
+-     status_code=status.HTTP_404_NOT_FOUND,
+-     detail="Items not found",
++ # Re-raise database errors as 500 Internal Server Error
++ # This allows proper error handling and observability
++ raise HTTPException(
++     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
++     detail="Database error occurred",
+ ) from exc
+```
+
+### Post-Fix Verification
+
+**After rebuild and redeploy:**
+```bash
+docker compose --env-file .env.docker.secret build backend
+docker compose --env-file .env.docker.secret up -d backend
+```
+
+**Test with PostgreSQL stopped:**
+```bash
+docker compose stop postgres
+curl -s http://localhost:42002/items/ -H "Authorization: Bearer lms-key"
+# Response: {"detail":"Database error occurred"}
+# Status: 500 Internal Server Error
+```
+
+**Backend logs after fix:**
+```
+backend-1  | 2026-03-28 12:58:10,560 ERROR [app.db.items] [items.py:20] - db_query
+backend-1  | 2026-03-28 12:58:10,560 ERROR [app.main] [main.py:68] - request_completed
+backend-1  | INFO: 172.20.0.10:47194 - "GET /items/ HTTP/1.1" 500 Internal Server Error
+```
+
+### Healthy Follow-Up
+
+**After PostgreSQL restart:**
+```bash
+docker compose start postgres
+curl -s http://localhost:42002/items/ -H "Authorization: Bearer lms-key"
+# Response: [{"title":"Lab 01", ...}, ...]  # Success!
+# Status: 200 OK
+```
+
+**Health check report after recovery:**
+```
+✅ System Health Report - 13:00:00
+
+No errors in the last 2 minutes.
+System looks healthy.
+```
 
 ## Task 4B — Proactive health check
 
 <!-- Screenshot or transcript of the proactive health report that appears in the Flutter chat -->
-
-## Task 4C — Bug fix and recovery
-
-<!-- 1. Root cause identified
-     2. Code fix (diff or description)
-     3. Post-fix response to "What went wrong?" showing the real underlying failure
-     4. Healthy follow-up report or transcript after recovery -->
