@@ -220,7 +220,7 @@ Querying VictoriaLogs at `http://localhost:42010` with LogsQL `severity:ERROR` r
 - Instant results in JSON format
 - Can correlate with traces via `trace_id`
 
-Example query result showing the error pattern across the system.
+![VictoriaLogs query result](instructors/task-3a-victorialogs-screenshot.png)
 
 ## Task 3B — Traces
 
@@ -268,6 +268,14 @@ The error log entry contains:
 ```
 
 **Note:** VictoriaTraces in this version uses OTLP native API rather than Jaeger API. The MCP tools gracefully handle this by directing users to query logs via `trace_id` when the Jaeger API is unavailable.
+
+### Screenshots
+
+**Healthy trace:**
+![Healthy trace](instructors/task-3b-healthy-trace.png)
+
+**Error trace:**
+![Error trace](instructors/task-3b-error-trace.png)
 
 ## Task 3C — Observability MCP tools
 
